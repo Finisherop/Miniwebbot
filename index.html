@@ -105,7 +105,7 @@
             </div>
             <div class="card text-center p-4">
                 <p class="text-3xl font-bold text-red-500" id="total-withdrawals">0</p>
-                <p class="text-sm text-gray-500">Total Withdrawn ($)</p>
+                <p class="text-sm text-gray-500">Total Withdrawn Amount ($)</p>
             </div>
         </div>
 
@@ -134,7 +134,7 @@
             <p class="text-lg font-semibold mb-4 text-gray-700">Current Balance: <span id="withdrawal-balance" class="text-yellow-500 font-extrabold">0 Coins</span></p>
 
             <label for="upi-id" class="block text-sm font-medium text-gray-700 mb-1">Payment Address / UPI ID</label>
-            <input type="text" id="upi-id" placeholder="e.g., yourname@upi or crypto address" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+            <input type="text" id="upi-id" placeholder="Example: yourname@upi or crypto address" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
 
             <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">Withdrawal Amount (Coins)</label>
             <input type="number" id="amount" placeholder="Minimum 1000" class="w-full p-3 mb-6 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
@@ -238,16 +238,16 @@
     };
 
     // --- RTDB Path Generators ---
-
     const Path = {
         userStats: (uid) => `${appId}/users/${uid}/stats`,
-        tasks: () => `${appId}/tasks`,
+        tasks: () => `${appId}/tasks`, // Public collection
         withdrawals: (uid) => `${appId}/users/${uid}/withdrawals`,
     };
 
     // --- Telegram WebApp & User Initialization ---
 
     function getTelegramUserInfo() {
+        // Telegram user data is available instantly via initDataUnsafe
         if (typeof Telegram !== 'undefined' && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) {
             const user = Telegram.WebApp.initDataUnsafe.user;
             console.log("Running in Telegram environment. User ID:", user.id);
@@ -274,6 +274,7 @@
         // Initialize Telegram WebApp SDK
         try {
             if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
+                // Ensure Telegram environment is ready before proceeding
                 Telegram.WebApp.ready();
                 Telegram.WebApp.expand();
                 Telegram.WebApp.MainButton.hide();
@@ -292,10 +293,11 @@
             console.log("Realtime Database initialized successfully. Attempting to connect...");
         } catch (e) {
             console.error("Firebase App initialization failed:", e);
-            showAlert("Firebase configuration error. Check console!", 'error');
+            showAlert("Firebase Configuration Error. Check console!", 'error');
             return;
         }
 
+        // Wait for user setup and data writing (This is where the DB call happens)
         await handleUserSetup(currentUserId, tgUserData.referrerId);
         subscribeToUserData(currentUserId);
         subscribeToTasks();
@@ -321,13 +323,15 @@
                     createdAt: new Date().toISOString(),
                     refferBy: referrerId || null,
                 };
-                await set(userRef, initialData);
-                console.log(`New user created: ${userId}`);
+                // Await ensures the data write completes before proceeding
+                await set(userRef, initialData); 
+                console.log(`New user created: ${userId}`); // <<< CHECK FOR THIS MESSAGE!
 
                 // If a valid referrer ID exists, credit the referrer (using RTDB transaction)
                 if (referrerId && referrerId !== userId) {
                     const referrerRef = ref(db, Path.userStats(referrerId));
 
+                    // Use transaction to ensure atomic increment of referral count
                     await transaction(referrerRef, (currentData) => {
                         if (currentData) {
                             currentData.reffer = (currentData.reffer || 0) + 1;
@@ -343,7 +347,9 @@
                 }).catch(e => console.error("Failed to update user profile on login:", e));
             }
         } catch (e) {
-            console.error("User setup failed (Check Security Rules and RTDB URL):", e);
+            // CRITICAL: If this logs an error, it means Firebase connection or rules failed.
+            console.error("User setup failed (Check Security Rules and RTDB URL):", e); 
+            showAlert("User setup failed. Check the error in the console.", 'error');
         }
 
         // Set the referral link input
@@ -440,126 +446,4 @@
     // --- Action Handlers ---
 
     /** Handles the process of claiming a task reward. */
-    window.claimReward = async function(taskId, rewardAmount) {
-        if (!isAppReady) {
-            showAlert("App is still initializing. Please wait.", 'error');
-            return;
-        }
-
-        const userRef = ref(db, Path.userStats(currentUserId));
-
-        // Use RTDB transaction to ensure atomic update of coins and task count
-        try {
-            await transaction(userRef, (currentData) => {
-                if (currentData) {
-                    const newCoins = (currentData.coins || 0) + rewardAmount;
-                    const newTasksCompleted = (currentData.tasksCompleted || 0) + 1;
-
-                    currentData.coins = newCoins;
-                    currentData.tasksCompleted = newTasksCompleted;
-                }
-                return currentData;
-            }, (error, committed) => {
-                if (error) {
-                    console.error("Reward claim transaction failed:", error);
-                    showAlert(`Failed to claim reward. Error: ${error.message}`, 'error');
-                } else if (committed) {
-                    showAlert(`Successfully claimed ${rewardAmount} Coins!`, 'success');
-                    if (typeof Telegram !== 'undefined' && Telegram.WebApp.HapticFeedback) {
-                        Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                    }
-                }
-            }, false); // applyLocal: false
-        } catch (e) {
-            console.error("Claim reward failed: ", e);
-            showAlert(`Claim reward failed. Error: ${e.message || e}`, 'error');
-        }
-    };
-
-    /** Handles submitting a withdrawal request. */
-    window.submitWithdrawal = async function() {
-        if (!isAppReady) {
-            showAlert("App is still initializing. Please wait.", 'error');
-            return;
-        }
-
-        const upiId = document.getElementById('upi-id').value.trim();
-        const amountStr = document.getElementById('amount').value.trim();
-        const amount = parseInt(amountStr, 10);
-        const submitBtn = document.getElementById('submit-withdrawal-btn');
-
-        if (!upiId || !amount || amount <= 0) {
-            showAlert("Please enter a valid Payment Address and a positive amount.", 'error');
-            return;
-        }
-        if (amount > userStats.coins) {
-            showAlert(`Withdrawal amount (${amount}) exceeds your balance (${userStats.coins}).`, 'error');
-            return;
-        }
-        if (amount < 1000) {
-             showAlert(`Minimum withdrawal amount is 1000 Coins.`, 'error');
-            return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Processing...';
-
-        const userRef = ref(db, Path.userStats(currentUserId));
-        const withdrawalsRef = ref(db, Path.withdrawals(currentUserId));
-
-        try {
-            // Use RTDB transaction to deduct coins atomically
-            await transaction(userRef, (currentData) => {
-                if (currentData) {
-                    const currentCoins = currentData.coins || 0;
-                    if (amount > currentCoins) {
-                        // Abort transaction if balance is insufficient
-                        return;
-                    }
-
-                    // 1. Deduct coins from the user
-                    currentData.coins = currentCoins - amount;
-                }
-                return currentData;
-            }, async (error, committed, snapshot) => {
-                if (error) {
-                    console.error("Withdrawal transaction failed:", error);
-                    showAlert(`Submission failed: ${error.message}`, 'error');
-                } else if (committed) {
-                    if (snapshot.val()) {
-                        // 2. Add withdrawal record
-                        const newWithdrawalRef = push(withdrawalsRef); // push() creates a new unique ID in RTDB
-                        await set(newWithdrawalRef, {
-                            userId: currentUserId,
-                            name: tgUserData.username,
-                            payment_address: upiId,
-                            amount: amount,
-                            status: "pending",
-                            requestedAt: new Date().toISOString(),
-                        });
-
-                        showAlert(`Withdrawal request (${amount} Coins) submitted! Status: Pending.`, 'success');
-                        document.getElementById('upi-id').value = '';
-                        document.getElementById('amount').value = '';
-                    } else {
-                        showAlert("Submission failed: Insufficient balance. Please try again.", 'error');
-                    }
-                }
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Request';
-            }, false); // applyLocal: false
-
-        } catch (e) {
-            console.error("Withdrawal submission failed (main block):", e);
-            showAlert(`Submission failed: ${e.message || e}`, 'error');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Submit Request';
-        }
-    };
-
-    // --- Initial Call ---
-    window.onload = initApp;
-
-</script>
-</body>
-</html>
+    window.claimReward = async functi
