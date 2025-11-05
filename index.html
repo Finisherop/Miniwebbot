@@ -288,14 +288,15 @@
 
         // Initialize Firebase Realtime Database
         try {
-            const app = initializeApp(firebaseConfig);
-            db = getDatabase(app);
-            console.log("Realtime Database initialized successfully. Attempting to connect...");
-        } catch (e) {
-            console.error("Firebase App initialization failed:", e);
-            showAlert("Firebase Configuration Error. Check console!", 'error');
-            return;
-        }
+  const app = initializeApp(firebaseConfig);
+  // ✅ Telegram fix — forces HTTP long-polling
+  db = getDatabase(app, { experimentalForceLongPolling: true });
+  console.log("Realtime Database initialized with long polling (Telegram-safe).");
+} catch (e) {
+  console.error("Firebase App initialization failed:", e);
+  showAlert("Firebase Configuration Error. Check console!", "error");
+  return;
+}
 
         // Wait for user setup and data writing (This is where the DB call happens)
         await handleUserSetup(currentUserId, tgUserData.referrerId);
