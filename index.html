@@ -339,26 +339,35 @@
         isAppReady = true;
     }
 
-    /** Creates or updates the user document and handles referral credit. */
-    async function handleUserSetup(userId, referrerId) {
-        const userRef = ref(db, Path.userStats(userId));
-
-        try {
-            const snapshot = await get(userRef);
-
-            if (!snapshot.exists()) {
-                // New user creation
-                const initialData = {
-                    id: userId,
-                    name: tgUserData.username,
-                    coins: 0,
-                    reffer: 0,
-                    tasksCompleted: 0,
-                    totalWithdrawals: 0,
-                    createdAt: new Date().toISOString(),
-                    refferBy: referrerId || null,
-                };
-                // Await ensures the data write completes before proceeding
+    function getTelegramUserInfo() {
+    if (typeof Telegram !== "undefined" && Telegram.WebApp.initDataUnsafe?.user) {
+        const user = Telegram.WebApp.initDataUnsafe.user;
+        console.log("✅ Telegram environment detected:", user.id);
+        return {
+            id: user.id.toString(),
+            first_name: user.first_name || "",
+            last_name: user.last_name || "",
+            username: user.username || "",
+            photo_url: user.photo_url || "",
+            language_code: user.language_code || "en",
+            is_premium: user.is_premium || false,
+            referrerId: Telegram.WebApp.initDataUnsafe.start_param || null,
+        };
+    }
+    // 🔧 Local test ke liye fake user
+    const fakeId = crypto.randomUUID();
+    console.warn("⚠️ Not in Telegram WebApp. Using fake user:", fakeId);
+    return {
+        id: fakeId,
+        first_name: "Test",
+        last_name: "User",
+        username: "fallback",
+        photo_url: "",
+        language_code: "en",
+        is_premium: false,
+        referrerId: null,
+    };
+}       // Await ensures the data write completes before proceeding
                 await set(userRef, initialData); 
                 console.log(`New user created: ${userId}`); // <<< CHECK FOR THIS MESSAGE!
 
