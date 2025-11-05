@@ -246,30 +246,64 @@
 
     // --- Telegram WebApp & User Initialization ---
 
-    function getTelegramUserInfo() {
-        // Telegram user data is available instantly via initDataUnsafe
-        if (typeof Telegram !== 'undefined' && Telegram.WebApp.initDataUnsafe && Telegram.WebApp.initDataUnsafe.user) {
-            const user = Telegram.WebApp.initDataUnsafe.user;
-            console.log("Running in Telegram environment. User ID:", user.id);
-            return {
-                id: user.id.toString(),
-                username: user.username || user.first_name,
-                photo_url: user.photo_url || null,
-                // start_param contains the referrer ID if the bot was opened via a referral link
-                referrerId: Telegram.WebApp.initDataUnsafe.start_param ? Telegram.WebApp.initDataUnsafe.start_param.toString() : null
+    async function handleUserSetup(userId, referrerId) {
+    const userRef = ref(db, Path.userStats(userId));
+
+    try {
+        const snapshot = await get(userRef);
+
+        if (!snapshot.exists()) {
+            // 🆕 New user
+            const initialData = {
+                id: userId,
+                first_name: tgUserData.first_name,
+                last_name: tgUserData.last_name,
+                username: tgUserData.username,
+                photo_url: tgUserData.photo_url,
+                language: tgUserData.language_code,
+                is_premium: tgUserData.is_premium,
+                coins: 0,
+                reffer: 0,
+                tasksCompleted: 0,
+                totalWithdrawals: 0,
+                refferBy: referrerId || null,
+                joinedAt: new Date().toISOString(),
             };
+            await set(userRef, initialData);
+            console.log(`🆕 User saved to RTDB: ${userId}`);
+
+            // If referred by someone, update referrer count
+            if (referrerId && referrerId !== userId) {
+                const referrerRef = ref(db, Path.userStats(referrerId));
+                await transaction(referrerRef, (data) => {
+                    if (data) {
+                        data.reffer = (data.reffer || 0) + 1;
+                        return data;
+                    }
+                    return data;
+                });
+                console.log(`🎯 Referral credited to: ${referrerId}`);
+            }
+        } else {
+            // 🧠 Existing user → just update profile fields if changed
+            await update(userRef, {
+                first_name: tgUserData.first_name,
+                last_name: tgUserData.last_name,
+                username: tgUserData.username,
+                photo_url: tgUserData.photo_url,
+                is_premium: tgUserData.is_premium,
+                lastLogin: new Date().toISOString(),
+            });
+            console.log(`♻️ User updated: ${userId}`);
         }
-        // Fallback for testing outside Telegram environment
-        const fallbackId = crypto.randomUUID(); // Use a unique ID if not in TG
-        console.warn("WARNING: Running outside Telegram WebApp. Using dummy User ID:", fallbackId);
-        return {
-            id: fallbackId,
-            username: 'FallbackUser',
-            photo_url: null,
-            referrerId: null,
-        };
+    } catch (e) {
+        console.error("❌ User setup failed:", e);
+        showAlert("User data setup failed. Check console.", "error");
     }
 
+    document.getElementById("referral-link-input").value =
+        `https://t.me/your_bot_username?start=${userId}`;
+}
     async function initApp() {
         // Initialize Telegram WebApp SDK
         try {
