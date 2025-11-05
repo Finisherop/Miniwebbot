@@ -456,4 +456,110 @@
                     const newTasksCompleted = (currentData.tasksCompleted || 0) + 1;
 
                     currentData.coins = newCoins;
-       
+                    currentData.tasksCompleted = newTasksCompleted;
+                }
+                return currentData;
+            }, (error, committed) => {
+                if (error) {
+                    console.error("Reward claim transaction failed:", error);
+                    showAlert(`Failed to claim reward. Error: ${error.message}`, 'error');
+                } else if (committed) {
+                    showAlert(`Successfully claimed ${rewardAmount} Coins!`, 'success');
+                    if (typeof Telegram !== 'undefined' && Telegram.WebApp.HapticFeedback) {
+                        Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    }
+                }
+            }, false); // applyLocal: false
+        } catch (e) {
+            console.error("Claim reward failed: ", e);
+            showAlert(`Claim reward failed. Error: ${e.message || e}`, 'error');
+        }
+    };
+
+    /** Handles submitting a withdrawal request. */
+    window.submitWithdrawal = async function() {
+        if (!isAppReady) {
+            showAlert("App is still initializing. Please wait.", 'error');
+            return;
+        }
+
+        const upiId = document.getElementById('upi-id').value.trim();
+        const amountStr = document.getElementById('amount').value.trim();
+        const amount = parseInt(amountStr, 10);
+        const submitBtn = document.getElementById('submit-withdrawal-btn');
+
+        if (!upiId || !amount || amount <= 0) {
+            showAlert("Please enter a valid Payment Address and a positive amount.", 'error');
+            return;
+        }
+        if (amount > userStats.coins) {
+            showAlert(`Withdrawal amount (${amount}) exceeds your balance (${userStats.coins}).`, 'error');
+            return;
+        }
+        if (amount < 1000) {
+             showAlert(`Minimum withdrawal amount is 1000 Coins.`, 'error');
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Processing...';
+
+        const userRef = ref(db, Path.userStats(currentUserId));
+        const withdrawalsRef = ref(db, Path.withdrawals(currentUserId));
+
+        try {
+            // Use RTDB transaction to deduct coins atomically
+            await transaction(userRef, (currentData) => {
+                if (currentData) {
+                    const currentCoins = currentData.coins || 0;
+                    if (amount > currentCoins) {
+                        // Abort transaction if balance is insufficient
+                        return;
+                    }
+
+                    // 1. Deduct coins from the user
+                    currentData.coins = currentCoins - amount;
+                }
+                return currentData;
+            }, async (error, committed, snapshot) => {
+                if (error) {
+                    console.error("Withdrawal transaction failed:", error);
+                    showAlert(`Submission failed: ${error.message}`, 'error');
+                } else if (committed) {
+                    if (snapshot.val()) {
+                        // 2. Add withdrawal record
+                        const newWithdrawalRef = push(withdrawalsRef); // push() creates a new unique ID in RTDB
+                        await set(newWithdrawalRef, {
+                            userId: currentUserId,
+                            name: tgUserData.username,
+                            payment_address: upiId,
+                            amount: amount,
+                            status: "pending",
+                            requestedAt: new Date().toISOString(),
+                        });
+
+                        showAlert(`Withdrawal request (${amount} Coins) submitted! Status: Pending.`, 'success');
+                        document.getElementById('upi-id').value = '';
+                        document.getElementById('amount').value = '';
+                    } else {
+                        showAlert("Submission failed: Insufficient balance. Please try again.", 'error');
+                    }
+                }
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Request';
+            }, false); // applyLocal: false
+
+        } catch (e) {
+            console.error("Withdrawal submission failed (main block):", e);
+            showAlert(`Submission failed: ${e.message || e}`, 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Request';
+        }
+    };
+
+    // --- Initial Call ---
+    window.onload = initApp;
+
+</script>
+</body>
+</html>
