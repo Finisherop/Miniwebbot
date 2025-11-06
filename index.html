@@ -1,616 +1,327 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram User Panel (TMA) - RTDB</title>
-    <!-- Load Telegram WebApp SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Custom styles for Telegram Mini App look and feel */
-        body {
-            background-color: #f7f9fc;
-            font-family: 'Inter', sans-serif;
-            color: #1a202c;
-            padding: 0;
-            margin: 0;
-            min-height: 100vh;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 1rem;
-        }
-        .card {
-            background-color: #ffffff;
-            border-radius: 1.5rem;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            transition: transform 0.1s;
-        }
-        .button-primary {
-            background-color: #0088cc; /* Telegram Blue */
-            color: white;
-            padding: 0.75rem 1.5rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s;
-        }
-        .button-primary:hover {
-            background-color: #0077b3;
-        }
-        .button-primary:active {
-            transform: scale(0.98);
-        }
-        .tab-button {
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            color: #555;
-        }
-        .tab-button.active {
-            background-color: #e0f2ff;
-            color: #0088cc;
-            font-weight: 600;
-        }
-        /* Hide sections initially, show via JS */
-        .content-section {
-            display: none;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Telegram User Panel (TMA) - RTDB</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      background-color: #f7f9fc;
+      font-family: "Inter", sans-serif;
+      color: #1a202c;
+      padding: 0;
+      margin: 0;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    .card {
+      background-color: #fff;
+      border-radius: 1.5rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      transition: transform 0.1s;
+    }
+    .button-primary {
+      background-color: #0088cc;
+      color: white;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    .button-primary:hover {
+      background-color: #0077b3;
+    }
+    .button-primary:active {
+      transform: scale(0.98);
+    }
+    .tab-button {
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      color: #555;
+    }
+    .tab-button.active {
+      background-color: #e0f2ff;
+      color: #0088cc;
+      font-weight: 600;
+    }
+    .content-section {
+      display: none;
+    }
+  </style>
 </head>
 <body>
+  <div class="container">
+    <h1 class="text-3xl font-extrabold text-center mb-6 text-[#0088cc]">
+      User Dashboard (Telegram Mini App)
+    </h1>
 
-<div class="container">
-    <h1 class="text-3xl font-extrabold text-center mb-6 text-[#0088cc]">User Dashboard (Telegram Mini App)</h1>
-
-    <!-- Tab Navigation -->
     <div class="flex justify-around bg-white p-2 rounded-xl shadow-md mb-6">
-        <button id="tab-dashboard" onclick="showSection('dashboard')" class="tab-button active">Dashboard</button>
-        <button id="tab-tasks" onclick="showSection('tasks-all')" class="tab-button">All Tasks</button>
-        <button id="tab-withdrawals" onclick="showSection('withdrawals')" class="tab-button">Withdrawals</button>
+      <button id="tab-dashboard" onclick="showSection('dashboard')" class="tab-button active">Dashboard</button>
+      <button id="tab-tasks" onclick="showSection('tasks-all')" class="tab-button">All Tasks</button>
+      <button id="tab-withdrawals" onclick="showSection('withdrawals')" class="tab-button">Withdrawals</button>
     </div>
 
-    <!-- Message/Alert Box -->
     <div id="alert-box" class="hidden p-3 mb-4 text-sm rounded-lg" role="alert"></div>
 
-    <!-- 1. DASHBOARD SECTION -->
+    <!-- DASHBOARD -->
     <section id="dashboard" class="content-section block">
-        <div class="card flex items-center space-x-4">
-            <img id="profile-img" class="w-16 h-16 rounded-full object-cover bg-gray-200" src="https://placehold.co/100x100/eeeeee/333333?text=P" onerror="this.src='https://placehold.co/100x100/eeeeee/333333?text=P';">
-            <div>
-                <p id="username-display" class="text-xl font-bold">Loading...</p>
-                <p class="text-xs text-gray-500">TG ID: <span id="user-id-display">0000</span></p>
-            </div>
+      <div class="card flex items-center space-x-4">
+        <img id="profile-img" class="w-16 h-16 rounded-full object-cover bg-gray-200" src="https://placehold.co/100x100/eeeeee/333333?text=P" />
+        <div>
+          <p id="username-display" class="text-xl font-bold">Loading...</p>
+          <p class="text-xs text-gray-500">TG ID: <span id="user-id-display">0000</span></p>
         </div>
+      </div>
 
-        <div class="grid grid-cols-2 gap-4 mb-6">
-            <div class="card text-center p-4">
-                <p class="text-3xl font-bold text-yellow-500" id="total-coins">0</p>
-                <p class="text-sm text-gray-500">Total Coins</p>
-            </div>
-            <div class="card text-center p-4">
-                <p class="text-3xl font-bold text-green-500" id="total-referrals">0</p>
-                <p class="text-sm text-gray-500">Total Referrals</p>
-            </div>
-            <div class="card text-center p-4">
-                <p class="text-3xl font-bold text-blue-500" id="tasks-completed">0</p>
-                <p class="text-sm text-gray-500">Tasks Completed</p>
-            </div>
-            <div class="card text-center p-4">
-                <p class="text-3xl font-bold text-red-500" id="total-withdrawals">0</p>
-                <p class="text-sm text-gray-500">Total Withdrawn Amount ($)</p>
-            </div>
+      <div class="grid grid-cols-2 gap-4 mb-6">
+        <div class="card text-center p-4">
+          <p class="text-3xl font-bold text-yellow-500" id="total-coins">0</p>
+          <p class="text-sm text-gray-500">Total Coins</p>
         </div>
+        <div class="card text-center p-4">
+          <p class="text-3xl font-bold text-green-500" id="total-referrals">0</p>
+          <p class="text-sm text-gray-500">Total Referrals</p>
+        </div>
+        <div class="card text-center p-4">
+          <p class="text-3xl font-bold text-blue-500" id="tasks-completed">0</p>
+          <p class="text-sm text-gray-500">Tasks Completed</p>
+        </div>
+        <div class="card text-center p-4">
+          <p class="text-3xl font-bold text-red-500" id="total-withdrawals">0</p>
+          <p class="text-sm text-gray-500">Total Withdrawn ($)</p>
+        </div>
+      </div>
 
-        <!-- Quick Task Section -->
-        <h2 class="text-2xl font-bold mb-4 text-[#0088cc]">⚡ Quick Tasks</h2>
-        <div id="quick-tasks-list">
-            <!-- Quick tasks will be injected here -->
-            <p class="text-center text-gray-500 p-4">Loading tasks...</p>
-        </div>
+      <h2 class="text-2xl font-bold mb-4 text-[#0088cc]">⚡ Quick Tasks</h2>
+      <div id="quick-tasks-list">
+        <p class="text-center text-gray-500 p-4">Loading tasks...</p>
+      </div>
     </section>
 
-    <!-- 2. ALL TASKS SECTION -->
+    <!-- TASKS -->
     <section id="tasks-all" class="content-section">
-        <h2 class="text-2xl font-bold mb-4 text-[#0088cc]">🧾 All Available Tasks</h2>
-        <div id="all-tasks-list">
-             <!-- All tasks will be injected here -->
-             <p class="text-center text-gray-500 p-4">Loading tasks...</p>
-        </div>
+      <h2 class="text-2xl font-bold mb-4 text-[#0088cc]">🧾 All Tasks</h2>
+      <div id="all-tasks-list">
+        <p class="text-center text-gray-500 p-4">Loading tasks...</p>
+      </div>
     </section>
 
-    <!-- 3. WITHDRAWAL SECTION -->
+    <!-- WITHDRAWALS -->
     <section id="withdrawals" class="content-section">
-        <h2 class="text-2xl font-bold mb-4 text-[#0088cc]">💰 Request Withdrawal</h2>
+      <h2 class="text-2xl font-bold mb-4 text-[#0088cc]">💰 Withdraw</h2>
 
-        <div class="card">
-            <p class="text-lg font-semibold mb-4 text-gray-700">Current Balance: <span id="withdrawal-balance" class="text-yellow-500 font-extrabold">0 Coins</span></p>
+      <div class="card">
+        <p class="text-lg font-semibold mb-4 text-gray-700">
+          Balance: <span id="withdrawal-balance" class="text-yellow-500 font-extrabold">0 Coins</span>
+        </p>
 
-            <label for="upi-id" class="block text-sm font-medium text-gray-700 mb-1">Payment Address / UPI ID</label>
-            <input type="text" id="upi-id" placeholder="Example: yourname@upi or crypto address" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+        <label for="upi-id" class="block text-sm font-medium text-gray-700 mb-1">UPI / Wallet</label>
+        <input type="text" id="upi-id" placeholder="example@upi or wallet address" class="w-full p-3 mb-4 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
 
-            <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">Withdrawal Amount (Coins)</label>
-            <input type="number" id="amount" placeholder="Minimum 1000" class="w-full p-3 mb-6 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+        <label for="amount" class="block text-sm font-medium text-gray-700 mb-1">Amount (Coins)</label>
+        <input type="number" id="amount" placeholder="Minimum 1000" class="w-full p-3 mb-6 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
 
-            <button id="submit-withdrawal-btn" onclick="submitWithdrawal()" class="button-primary w-full disabled:opacity-50" disabled>
-                Submit Request
-            </button>
+        <button id="submit-withdrawal-btn" onclick="submitWithdrawal()" class="button-primary w-full" disabled>
+          Submit Request
+        </button>
+      </div>
+
+      <h2 class="text-xl font-bold mt-8 mb-3 text-gray-700">Share & Earn</h2>
+      <div class="card">
+        <p class="text-md font-semibold mb-2">Your Referral Link:</p>
+        <div class="flex space-x-2">
+          <input type="text" id="referral-link-input" class="flex-grow p-3 text-sm border border-gray-300 rounded-l-lg bg-gray-50 overflow-auto" readonly value="Loading..." />
+          <button onclick="copyReferralLink()" class="p-3 bg-gray-200 text-gray-600 rounded-r-lg hover:bg-gray-300 transition">
+            Copy
+          </button>
         </div>
-
-        <!-- Referral Info -->
-        <h2 class="text-xl font-bold mt-8 mb-3 text-gray-700">Share and Earn</h2>
-        <div class="card">
-            <p class="text-md font-semibold mb-2">Your Referral Link:</p>
-            <div class="flex space-x-2">
-                <input type="text" id="referral-link-input" class="flex-grow p-3 text-sm border border-gray-300 rounded-l-lg bg-gray-50 overflow-auto" readonly value="Loading...">
-                <button onclick="copyReferralLink()" class="p-3 bg-gray-200 text-gray-600 rounded-r-lg hover:bg-gray-300 transition duration-150">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5h6a2 2 0 012 2v2M8 5v2m6-2v2m-6 4h.01M12 11h.01M15 11h.01M8 15h.01M12 15h.01M15 15h.01"></path></svg>
-                </button>
-            </div>
-            <p class="text-sm mt-3 text-gray-500">Total Referrals: <span id="ref-count-display" class="font-bold text-green-600">0</span></p>
-        </div>
+        <p class="text-sm mt-3 text-gray-500">Referrals: <span id="ref-count-display" class="font-bold text-green-600">0</span></p>
+      </div>
     </section>
+  </div>
 
-</div>
-
-<!-- Firebase and App Logic Script -->
-<script type="module">
-    // --- Firebase SDK Imports (Realtime Database) ---
-    // Using a stable Firebase version (10.12.2) to ensure all functions like 'transaction' are available.
+  <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getDatabase, ref, onValue, set, update, push, transaction, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-    // --- Global Configuration (MANDATORY ENVIRONMENT VARIABLES) ---
-    // Ensure that __firebase_config contains your REALTIME DATABASE URL.
     const firebaseConfig = {
-  apiKey: "AIzaSyDGoRhvD8PtRxVu8bkxdL-PGn6bbR-XTeQ",
-  authDomain: "task-73eb2.firebaseapp.com",
-  databaseURL: "https://task-73eb2-default-rtdb.firebaseio.com",
-  projectId: "task-73eb2",
-  storageBucket: "task-73eb2.firebasestorage.app",
-  messagingSenderId: "195157634491",
-  appId: "1:195157634491:web:6f2d72751149d93bd0289e"
-};
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'tma-userpanel-default';
+      apiKey: "AIzaSyDGoRhvD8PtRxVu8bkxdL-PGn6bbR-XTeQ",
+      authDomain: "task-73eb2.firebaseapp.com",
+      databaseURL: "https://task-73eb2-default-rtdb.firebaseio.com",
+      projectId: "task-73eb2",
+      storageBucket: "task-73eb2.firebasestorage.app",
+      messagingSenderId: "195157634491",
+      appId: "1:195157634491:web:6f2d72751149d93bd0289e"
+    };
 
-    // --- Core App Variables ---
-    let db;
-    let currentUserId = null;
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app, { experimentalForceLongPolling: true });
+    console.log("🔥 Firebase initialized (Telegram-safe HTTP polling mode)");
+
     let tgUserData = null;
+    let currentUserId = null;
     let isAppReady = false;
-    let userStats = {
-        id: '',
-        name: '',
-        coins: 0,
-        reffer: 0,
-        refferBy: null,
-        tasksCompleted: 0,
-        totalWithdrawals: 0,
-    };
 
-    // --- Utility Functions ---
-
-    /** Displays an alert message in the UI */
-    function showAlert(message, type = 'success') {
-        const box = document.getElementById('alert-box');
-        box.textContent = message;
-        box.className = `p-3 mb-4 text-sm rounded-lg ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
-        box.classList.remove('hidden');
-        if (typeof Telegram !== 'undefined' && Telegram.WebApp.showAlert) {
-            Telegram.WebApp.showAlert(message); // Telegram native alert
-        }
-        setTimeout(() => box.classList.add('hidden'), 5000);
-    }
-
-    /** Switches the displayed content section */
-    window.showSection = function(sectionId) {
-        document.querySelectorAll('.content-section').forEach(section => {
-            section.style.display = 'none';
-        });
-        document.getElementById(sectionId).style.display = 'block';
-
-        document.querySelectorAll('.tab-button').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        document.getElementById('tab-' + sectionId.replace('-all', '')).classList.add('active');
-
-        if (typeof Telegram !== 'undefined' && Telegram.WebApp.HapticFeedback) {
-            Telegram.WebApp.HapticFeedback.selectionChanged();
-        }
-    };
-
-    /** Copies the referral link to the clipboard */
-    window.copyReferralLink = function() {
-        const input = document.getElementById('referral-link-input');
-        input.select();
-        document.execCommand('copy');
-        showAlert('Referral link copied!', 'success');
-        if (typeof Telegram !== 'undefined' && Telegram.WebApp.HapticFeedback) {
-            Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-        }
-    };
-
-    // --- RTDB Path Generators ---
     const Path = {
-        userStats: (uid) => `${appId}/users/${uid}/stats`,
-        tasks: () => `${appId}/tasks`, // Public collection
-        withdrawals: (uid) => `${appId}/users/${uid}/withdrawals`,
+      userStats: (uid) => `tma-userpanel-default/users/${uid}/stats`,
+      tasks: () => `tma-userpanel-default/tasks`,
+      withdrawals: (uid) => `tma-userpanel-default/users/${uid}/withdrawals`,
     };
 
-    // --- Telegram WebApp & User Initialization ---
-
-    async function handleUserSetup(userId, referrerId) {
-    const userRef = ref(db, Path.userStats(userId));
-
-    try {
-        const snapshot = await get(userRef);
-
-        if (!snapshot.exists()) {
-            // 🆕 New user
-            const initialData = {
-                id: userId,
-                first_name: tgUserData.first_name,
-                last_name: tgUserData.last_name,
-                username: tgUserData.username,
-                photo_url: tgUserData.photo_url,
-                language: tgUserData.language_code,
-                is_premium: tgUserData.is_premium,
-                coins: 0,
-                reffer: 0,
-                tasksCompleted: 0,
-                totalWithdrawals: 0,
-                refferBy: referrerId || null,
-                joinedAt: new Date().toISOString(),
-            };
-            await set(userRef, initialData);
-            console.log(`🆕 User saved to RTDB: ${userId}`);
-
-            // If referred by someone, update referrer count
-            if (referrerId && referrerId !== userId) {
-                const referrerRef = ref(db, Path.userStats(referrerId));
-                await transaction(referrerRef, (data) => {
-                    if (data) {
-                        data.reffer = (data.reffer || 0) + 1;
-                        return data;
-                    }
-                    return data;
-                });
-                console.log(`🎯 Referral credited to: ${referrerId}`);
-            }
-        } else {
-            // 🧠 Existing user → just update profile fields if changed
-            await update(userRef, {
-                first_name: tgUserData.first_name,
-                last_name: tgUserData.last_name,
-                username: tgUserData.username,
-                photo_url: tgUserData.photo_url,
-                is_premium: tgUserData.is_premium,
-                lastLogin: new Date().toISOString(),
-            });
-            console.log(`♻️ User updated: ${userId}`);
-        }
-    } catch (e) {
-        console.error("❌ User setup failed:", e);
-        showAlert("User data setup failed. Check console.", "error");
+    function showAlert(msg, type = "success") {
+      const box = document.getElementById("alert-box");
+      box.textContent = msg;
+      box.className = `p-3 mb-4 text-sm rounded-lg ${
+        type === "success"
+          ? "bg-green-100 text-green-800"
+          : "bg-red-100 text-red-800"
+      }`;
+      box.classList.remove("hidden");
+      setTimeout(() => box.classList.add("hidden"), 5000);
+      if (Telegram?.WebApp?.showAlert) Telegram.WebApp.showAlert(msg);
     }
 
-    document.getElementById("referral-link-input").value =
-        `https://t.me/your_bot_username?start=${userId}`;
-}
-    async function initApp() {
-        // Initialize Telegram WebApp SDK
-        try {
-            if (typeof Telegram !== 'undefined' && Telegram.WebApp) {
-                // Ensure Telegram environment is ready before proceeding
-                Telegram.WebApp.ready();
-                Telegram.WebApp.expand();
-                Telegram.WebApp.MainButton.hide();
-            }
-        } catch (e) {
-            console.warn("Telegram WebApp SDK not initialized.");
-        }
+    function showSection(id) {
+      document.querySelectorAll(".content-section").forEach((sec) => (sec.style.display = "none"));
+      document.getElementById(id).style.display = "block";
+      document.querySelectorAll(".tab-button").forEach((btn) => btn.classList.remove("active"));
+      document.getElementById("tab-" + id.replace("-all", "")).classList.add("active");
+    }
 
-        tgUserData = getTelegramUserInfo();
-        currentUserId = tgUserData.id;
-
-        // Initialize Firebase Realtime Database
-        try {
-  const app = initializeApp(firebaseConfig);
-  // ✅ Telegram fix — forces HTTP long-polling
-  db = getDatabase(app, { experimentalForceLongPolling: true });
-  console.log("Realtime Database initialized with long polling (Telegram-safe).");
-} catch (e) {
-  console.error("Firebase App initialization failed:", e);
-  showAlert("Firebase Configuration Error. Check console!", "error");
-  return;
-}
-
-        // Wait for user setup and data writing (This is where the DB call happens)
-        await handleUserSetup(currentUserId, tgUserData.referrerId);
-        subscribeToUserData(currentUserId);
-        subscribeToTasks();
-        isAppReady = true;
+    function copyReferralLink() {
+      const input = document.getElementById("referral-link-input");
+      input.select();
+      document.execCommand("copy");
+      showAlert("Referral link copied!", "success");
     }
 
     function getTelegramUserInfo() {
-    if (typeof Telegram !== "undefined" && Telegram.WebApp.initDataUnsafe?.user) {
+      if (typeof Telegram !== "undefined" && Telegram.WebApp?.initDataUnsafe?.user) {
         const user = Telegram.WebApp.initDataUnsafe.user;
-        console.log("✅ Telegram environment detected:", user.id);
+        console.log("✅ Telegram user:", user);
         return {
-            id: user.id.toString(),
-            first_name: user.first_name || "",
-            last_name: user.last_name || "",
-            username: user.username || "",
-            photo_url: user.photo_url || "",
-            language_code: user.language_code || "en",
-            is_premium: user.is_premium || false,
-            referrerId: Telegram.WebApp.initDataUnsafe.start_param || null,
+          id: user.id.toString(),
+          first_name: user.first_name || "",
+          username: user.username || "",
+          photo_url: user.photo_url || "",
+          referrerId: Telegram.WebApp.initDataUnsafe.start_param || null,
         };
-    }
-    // 🔧 Local test ke liye fake user
-    const fakeId = crypto.randomUUID();
-    console.warn("⚠️ Not in Telegram WebApp. Using fake user:", fakeId);
-    return {
-        id: fakeId,
+      }
+      console.warn("⚠️ Not in Telegram WebApp, using fake user for test.");
+      return {
+        id: crypto.randomUUID(),
         first_name: "Test",
-        last_name: "User",
-        username: "fallback",
+        username: "test_user",
         photo_url: "",
-        language_code: "en",
-        is_premium: false,
         referrerId: null,
-    };
-}       // Await ensures the data write completes before proceeding
-                await set(userRef, initialData); 
-                console.log(`New user created: ${userId}`); // <<< CHECK FOR THIS MESSAGE!
+      };
+    }
 
-                // If a valid referrer ID exists, credit the referrer (using RTDB transaction)
-                if (referrerId && referrerId !== userId) {
-                    const referrerRef = ref(db, Path.userStats(referrerId));
-
-                    // Use transaction to ensure atomic increment of referral count
-                    await transaction(referrerRef, (currentData) => {
-                        if (currentData) {
-                            currentData.reffer = (currentData.reffer || 0) + 1;
-                        }
-                        return currentData; // Return updated data in RTDB transaction
-                    });
-                    console.log(`Referral count incremented for referrer: ${referrerId}`);
-                }
-            } else {
-                // Existing user update (like name/photo)
-                await update(userRef, {
-                    name: tgUserData.username,
-                }).catch(e => console.error("Failed to update user profile on login:", e));
-            }
-        } catch (e) {
-            // CRITICAL: If this logs an error, it means Firebase connection or rules failed.
-            console.error("User setup failed (Check Security Rules and RTDB URL):", e); 
-            showAlert("User setup failed. Check the error in the console.", 'error');
+    async function handleUserSetup(uid, referrer) {
+      const userRef = ref(db, Path.userStats(uid));
+      try {
+        const snap = await get(userRef);
+        if (!snap.exists()) {
+          await set(userRef, {
+            id: uid,
+            name: tgUserData.username,
+            coins: 0,
+            reffer: 0,
+            refferBy: referrer || null,
+            tasksCompleted: 0,
+            totalWithdrawals: 0,
+            joinedAt: new Date().toISOString(),
+          });
+          if (referrer && referrer !== uid) {
+            const refRef = ref(db, Path.userStats(referrer));
+            await transaction(refRef, (data) => {
+              if (data) data.reffer = (data.reffer || 0) + 1;
+              return data;
+            });
+          }
         }
-
-        // Set the referral link input
-        document.getElementById('referral-link-input').value = `https://t.me/your_bot_username?start=${userId}`;
+      } catch (e) {
+        console.error("User setup failed:", e);
+      }
+      document.getElementById("referral-link-input").value = `https://t.me/your_bot_username?start=${uid}`;
     }
 
-    // --- Real-time Data Subscriptions ---
-
-    /** Listens to the current user's stats document. */
-    function subscribeToUserData(userId) {
-        if (!userId || !db) return;
-
-        const userRef = ref(db, Path.userStats(userId));
-        onValue(userRef, (snapshot) => {
-            const data = snapshot.val();
-            if (data) {
-                userStats = { ...userStats, ...data };
-                renderDashboard();
-                document.getElementById('ref-count-display').textContent = userStats.reffer;
-                document.getElementById('withdrawal-balance').textContent = `${userStats.coins.toLocaleString()} Coins`;
-                // Allow withdrawal submission only if coins are available
-                document.getElementById('submit-withdrawal-btn').disabled = userStats.coins === 0 || userStats.coins < 1000; 
-            } else {
-                console.error("User stats data not found.");
-            }
-        }, (error) => {
-            console.error("Error listening to user data:", error);
-            showAlert("Error loading user data.", 'error');
-        });
+    function subscribeToUserData(uid) {
+      const userRef = ref(db, Path.userStats(uid));
+      onValue(userRef, (snap) => {
+        const data = snap.val();
+        if (!data) return;
+        document.getElementById("username-display").textContent = data.name;
+        document.getElementById("user-id-display").textContent = data.id;
+        document.getElementById("total-coins").textContent = data.coins;
+        document.getElementById("total-referrals").textContent = data.reffer;
+        document.getElementById("withdrawal-balance").textContent = `${data.coins} Coins`;
+        document.getElementById("ref-count-display").textContent = data.reffer;
+        document.getElementById("submit-withdrawal-btn").disabled = data.coins < 1000;
+      });
     }
 
-    /** Listens to the public tasks collection. */
     function subscribeToTasks() {
-        const tasksRef = ref(db, Path.tasks());
-        onValue(tasksRef, (snapshot) => {
-            const tasksData = snapshot.val();
-            const tasks = [];
-            if (tasksData) {
-                // Convert RTDB object to array
-                Object.keys(tasksData).forEach(key => {
-                    tasks.push({ id: key, ...tasksData[key] });
-                });
-            }
-            renderTasks(tasks);
-        }, (error) => {
-            console.error("Error listening to tasks:", error);
-            showAlert("Error loading tasks.", 'error');
-        });
+      const taskRef = ref(db, Path.tasks());
+      onValue(taskRef, (snap) => {
+        const tasksData = snap.val() || {};
+        const tasks = Object.entries(tasksData).map(([id, t]) => ({ id, ...t }));
+        const quick = tasks.slice(0, 3)
+          .map((t) => `<div class='card'><h3>${t.name}</h3><p>Reward: ${t.reward} Coins</p></div>`)
+          .join("");
+        document.getElementById("quick-tasks-list").innerHTML = quick || "No tasks available";
+      });
     }
 
-    // --- Rendering Functions ---
-
-    function renderDashboard() {
-        document.getElementById('profile-img').src = tgUserData.photo_url || 'https://placehold.co/100x100/eeeeee/333333?text=P';
-        document.getElementById('username-display').textContent = userStats.name || tgUserData.username;
-        document.getElementById('user-id-display').textContent = userStats.id;
-        document.getElementById('total-coins').textContent = userStats.coins.toLocaleString();
-        document.getElementById('total-referrals').textContent = userStats.reffer.toLocaleString();
-        document.getElementById('tasks-completed').textContent = userStats.tasksCompleted.toLocaleString();
-        document.getElementById('total-withdrawals').textContent = userStats.totalWithdrawals.toFixed(2); // Assuming withdrawn amount is currency
-    }
-
-    function renderTasks(tasks) {
-        const quickTasksContainer = document.getElementById('quick-tasks-list');
-        const allTasksContainer = document.getElementById('all-tasks-list');
-
-        if (tasks.length === 0) {
-            quickTasksContainer.innerHTML = '<p class="text-center text-gray-500 p-4">No quick tasks available.</p>';
-            allTasksContainer.innerHTML = '<p class="text-center text-gray-500 p-4">No tasks available.</p>';
-            return;
-        }
-
-        quickTasksContainer.innerHTML = tasks.slice(0, 3).map(task => createTaskCard(task, true)).join('');
-        allTasksContainer.innerHTML = tasks.map(task => createTaskCard(task, false)).join('');
-    }
-
-    function createTaskCard(task, isQuick) {
-        return `
-            <div class="card p-4 flex items-center justify-between space-x-3">
-                <div>
-                    <h3 class="text-lg font-semibold">${task.name}</h3>
-                    <p class="text-sm text-gray-500 mt-1">Reward: <span class="text-yellow-600 font-bold">${task.reward.toLocaleString()} Coins</span></p>
-                    <a href="${task.link}" target="_blank" class="text-xs text-[#0088cc] hover:underline mt-1 block">Open Link ${isQuick ? '(Quick View)' : ''}</a>
-                </div>
-                <button 
-                    onclick="claimReward('${task.id}', ${task.reward})" 
-                    class="button-primary text-sm whitespace-nowrap px-3 py-2">
-                    Claim Reward
-                </button>
-            </div>
-        `;
-    }
-
-    
-    // --- Action Handlers ---
-
-    /** Handles the process of claiming a task reward. */
-    window.claimReward = async function(taskId, rewardAmount) {
-        if (!isAppReady) {
-            showAlert("App is still initializing. Please wait.", 'error');
-            return;
-        }
-
-        const userRef = ref(db, Path.userStats(currentUserId));
-
-        // Use RTDB transaction to ensure atomic update of coins and task count
-        try {
-            await transaction(userRef, (currentData) => {
-                if (currentData) {
-                    const newCoins = (currentData.coins || 0) + rewardAmount;
-                    const newTasksCompleted = (currentData.tasksCompleted || 0) + 1;
-
-                    currentData.coins = newCoins;
-                    currentData.tasksCompleted = newTasksCompleted;
-                }
-                return currentData;
-            }, (error, committed) => {
-                if (error) {
-                    console.error("Reward claim transaction failed:", error);
-                    showAlert(`Failed to claim reward. Error: ${error.message}`, 'error');
-                } else if (committed) {
-                    showAlert(`Successfully claimed ${rewardAmount} coins!`, 'success');
-                    if (typeof Telegram !== 'undefined' && Telegram.WebApp.HapticFeedback) {
-                        Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                    }
-                }
-            }, false); // applyLocal: false
-        } catch (e) {
-            console.error("Claim reward failed: ", e);
-            showAlert(`Failed to claim reward. Error: ${e.message || e}`, 'error');
-        }
+    window.submitWithdrawal = async function () {
+      const upi = document.getElementById("upi-id").value.trim();
+      const amount = parseInt(document.getElementById("amount").value);
+      if (!upi || !amount) return showAlert("Enter valid UPI & amount", "error");
+      const userRef = ref(db, Path.userStats(currentUserId));
+      const wRef = ref(db, Path.withdrawals(currentUserId));
+      await transaction(userRef, (data) => {
+        if (data && data.coins >= amount) data.coins -= amount;
+        return data;
+      });
+      const newW = push(wRef);
+      await set(newW, {
+        userId: currentUserId,
+        payment_address: upi,
+        amount,
+        status: "pending",
+        requestedAt: new Date().toISOString(),
+      });
+      showAlert("Withdrawal request submitted!", "success");
     };
 
-    /** Handles submitting a withdrawal request. */
-    window.submitWithdrawal = async function() {
-        if (!isAppReady) {
-            showAlert("App is still initializing. Please wait.", 'error');
-            return;
-        }
+    async function initApp() {
+      try {
+        Telegram.WebApp.ready();
+        Telegram.WebApp.expand();
+      } catch (e) {
+        console.warn("Telegram SDK not found, test mode active.");
+      }
+      tgUserData = getTelegramUserInfo();
+      currentUserId = tgUserData.id;
+      await handleUserSetup(currentUserId, tgUserData.referrerId);
+      subscribeToUserData(currentUserId);
+      subscribeToTasks();
+      isAppReady = true;
+    }
 
-        const upiId = document.getElementById('upi-id').value.trim();
-        const amountStr = document.getElementById('amount').value.trim();
-        const amount = parseInt(amountStr, 10);
-        const submitBtn = document.getElementById('submit-withdrawal-btn');
-
-        if (!upiId || !amount || amount <= 0) {
-            showAlert("Please enter a valid payment address and a positive amount.", 'error');
-            return;
-        }
-        if (amount > userStats.coins) {
-            showAlert(`The withdrawal amount (${amount}) exceeds your balance (${userStats.coins}).`, 'error');
-            return;
-        }
-        if (amount < 1000) {
-             showAlert(`The minimum withdrawal amount is 1000 coins.`, 'error');
-            return;
-        }
-
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Processing...';
-
-        const userRef = ref(db, Path.userStats(currentUserId));
-        const withdrawalsRef = ref(db, Path.withdrawals(currentUserId));
-
-        try {
-            // Use RTDB transaction to deduct coins atomically
-            await transaction(userRef, (currentData) => {
-                if (currentData) {
-                    const currentCoins = currentData.coins || 0;
-                    if (amount > currentCoins) {
-                        // Abort transaction if balance is insufficient
-                        return;
-                    }
-
-                    // 1. Deduct coins from the user
-                    currentData.coins = currentCoins - amount;
-                }
-                return currentData;
-            }, async (error, committed, snapshot) => {
-                if (error) {
-                    console.error("Withdrawal transaction failed:", error);
-                    showAlert(`Failed to submit request: ${error.message}`, 'error');
-                } else if (committed) {
-                    if (snapshot.val()) {
-                        // 2. Add withdrawal record
-                        const newWithdrawalRef = push(withdrawalsRef); // push() creates a new unique ID in RTDB
-                        await set(newWithdrawalRef, {
-                            userId: currentUserId,
-                            name: tgUserData.username,
-                            payment_address: upiId,
-                            amount: amount,
-                            status: "pending",
-                            requestedAt: new Date().toISOString(),
-                        });
-
-                        showAlert(`Withdrawal request (${amount} coins) submitted! Status: pending.`, 'success');
-                        document.getElementById('upi-id').value = '';
-                        document.getElementById('amount').value = '';
-                    } else {
-                        showAlert("Failed to submit request: Insufficient balance. Please try again.", 'error');
-                    }
-                }
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Submit Request';
-            }, false); // applyLocal: false
-
-        } catch (e) {
-            console.error("Withdrawal submission failed (main block):", e);
-            showAlert(`Failed to submit request: ${e.message || e}`, 'error');
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Submit Request';
-        }
-    };
-
-    // --- Initial Call ---
     window.onload = initApp;
-
-</script>
+  </script>
 </body>
 </html>
