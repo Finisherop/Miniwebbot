@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>User Panel – Browser & Telegram (RTDB)</title>
+  <title>User Panel</title>
 
-  <!-- Telegram WebApp SDK (safe if opened in browser; it just won't run) -->
+  <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    
-  <!-- Tailwind -->
+  <!-- Tailwind CDN (ok for quick deploys / GitHub Pages) -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <style>
@@ -25,14 +24,14 @@
 <body>
   <div class="container">
     <h1 class="text-3xl font-extrabold text-center mb-6 text-[#0088cc]">
-      User Dashboard (Browser + Telegram)
+      User Panel
     </h1>
 
     <!-- Tabs -->
     <div class="flex justify-around bg-white p-2 rounded-xl shadow-md mb-6">
-      <button id="tab-dashboard"   class="tab-button active" onclick="showSection('dashboard')">Dashboard</button>
-      <button id="tab-tasks"       class="tab-button"        onclick="showSection('tasks-all')">All Tasks</button>
-      <button id="tab-withdrawals" class="tab-button"        onclick="showSection('withdrawals')">Withdrawals</button>
+      <button id="tab-dashboard"   class="tab-button active" data-target="dashboard">Dashboard</button>
+      <button id="tab-tasks"       class="tab-button"        data-target="tasks-all">All Tasks</button>
+      <button id="tab-withdrawals" class="tab-button"        data-target="withdrawals">Withdrawals</button>
     </div>
 
     <!-- Alerts -->
@@ -47,7 +46,6 @@
         <div>
           <p id="username-display" class="text-xl font-bold">Loading...</p>
           <p class="text-xs text-gray-500">ID: <span id="user-id-display">0000</span></p>
-          <p class="text-[11px] text-gray-500">Mode: <span id="mode-display">detecting…</span></p>
         </div>
       </div>
 
@@ -121,7 +119,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getDatabase, ref, onValue, set, update, push, transaction, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-    // ---- Config (same as before) ----
+    // ---- Config ----
     const firebaseConfig = {
       apiKey: "AIzaSyDGoRhvD8PtRxVu8bkxdL-PGn6bbR-XTeQ",
       authDomain: "task-73eb2.firebaseapp.com",
@@ -132,10 +130,10 @@
       appId: "1:195157634491:web:6f2d72751149d93bd0289e"
     };
 
-    // ---- App constants ----
-    const APP_NAMESPACE = "tma-userpanel-default"; // RTDB root for this app
+    // ---- Constants ----
+    const APP_NAMESPACE = "tma-userpanel-default";
 
-    // ---- Global state ----
+    // ---- State ----
     let db;
     let ENV = { mode: "detecting", uid: null, name: null, photo: "", referrerId: null, platform: "unknown" };
     let userStats = { id:"", name:"", coins:0, reffer:0, refferBy:null, tasksCompleted:0, totalWithdrawals:0 };
@@ -150,19 +148,33 @@
       setTimeout(()=>box.classList.add("hidden"), 4500);
       try { Telegram?.WebApp?.showAlert?.(message); } catch {}
     }
-    window.showSection = function(id){
-      document.querySelectorAll(".content-section").forEach(s=>s.style.display="none");
-      document.getElementById(id).style.display="block";
-      document.querySelectorAll(".tab-button").forEach(b=>b.classList.remove("active"));
-      document.getElementById("tab-"+id.replace("-all","")).classList.add("active");
+
+    // Hardened tab switcher (no id math bugs)
+    const tabBar = document.querySelector('.flex.justify-around');
+    tabBar.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-target]');
+      if (!btn) return;
+      const target = btn.getAttribute('data-target');
+      document.querySelectorAll('.content-section').forEach(s => s.style.display = 'none');
+      const sec = document.getElementById(target);
+      if (sec) sec.style.display = 'block';
+      document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
       try { Telegram?.WebApp?.HapticFeedback?.selectionChanged(); } catch {}
+    });
+
+    async function copyReferralLink(){
+      const value = document.getElementById("referral-link-input").value;
+      try {
+        if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(value);
+        else {
+          const input = document.getElementById("referral-link-input");
+          input.select(); document.execCommand("copy");
+        }
+        showAlert("Referral link copied!", "success");
+      } catch { showAlert("Copy failed", "error"); }
     }
-    window.copyReferralLink = function(){
-      const input = document.getElementById("referral-link-input");
-      input.select(); document.execCommand("copy");
-      showAlert("Referral link copied!", "success");
-      try { Telegram?.WebApp?.HapticFeedback?.notificationOccurred("success"); } catch {}
-    }
+    window.copyReferralLink = copyReferralLink;
 
     const Path = {
       userStats: (uid) => `${APP_NAMESPACE}/users/${uid}/stats`,
@@ -170,55 +182,59 @@
       withdrawals: (uid) => `${APP_NAMESPACE}/users/${uid}/withdrawals`,
     };
 
-    // ---- Environment detection (Browser vs Telegram) ----
-    function detectEnvironment(){
-      const isTelegram = (typeof Telegram !== "undefined") && !!Telegram.WebApp?.initDataUnsafe?.user;
-      if (isTelegram){
-        const u = Telegram.WebApp.initDataUnsafe.user;
-        return {
-          mode: "telegram",
-          platform: "telegram",
-          uid: String(u.id),
-          name: u.username || u.first_name || "TelegramUser",
-          photo: u.photo_url || "",
-          referrerId: Telegram.WebApp.initDataUnsafe.start_param || null
-        };
+    // ---- Environment detection + Telegram robust capture ----
+    async function getTelegramUserSafe(){
+      if (typeof Telegram === "undefined" || !Telegram.WebApp) return null;
+      try { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } catch {}
+      // retry a few times—Android sometimes injects initDataUnsafe late
+      for (let i=0;i<10;i++){
+        const u = Telegram.WebApp.initDataUnsafe?.user;
+        if (u?.id) {
+          return {
+            id: String(u.id),
+            name: u.username || u.first_name || "TelegramUser",
+            photo: u.photo_url || "",
+            referrerId: Telegram.WebApp.initDataUnsafe?.start_param || null,
+          };
+        }
+        await new Promise(r => setTimeout(r, 200));
       }
+      return null;
+    }
 
-      // Browser mode
+    function detectEnvironment(){
+      // try Telegram first
+      // (we fill rest inside initApp to allow async)
       const url = new URL(window.location.href);
       const refParam = url.searchParams.get("ref") || null;
+
+      // browser fallback id (stable)
       let guid = localStorage.getItem("guest_uid");
-      if (!guid){
-        guid = crypto.randomUUID();
-        localStorage.setItem("guest_uid", guid);
-      }
+      if (!guid){ guid = crypto.randomUUID(); localStorage.setItem("guest_uid", guid); }
+
       return {
         mode: "browser",
         platform: "web",
-        uid: "web-" + guid,        // stable per-browser id
+        uid: "web-" + guid,
         name: localStorage.getItem("guest_name") || "Guest",
         photo: "",
         referrerId: refParam
       };
     }
 
-    // ---- Firebase init (transport differs per mode) ----
     function initFirebase(mode){
       const app = initializeApp(firebaseConfig);
       if (mode === "telegram"){
-        // Force HTTP long-polling (WebSocket often blocked in Telegram WebView)
+        // Telegram WebView often blocks websockets: force HTTP long-polling
         db = getDatabase(app, { experimentalForceLongPolling: true });
-        // Extra hard-disable safety (optional)
         try { db._repoInfo_.forceWebSockets = false; } catch {}
         console.log("RTDB: Telegram mode (HTTP long-polling).");
       } else {
-        db = getDatabase(app); // Browser can use default (WS or fallback)
+        db = getDatabase(app); // default transport in normal browsers
         console.log("RTDB: Browser mode (default transport).");
       }
     }
 
-    // ---- User bootstrap ----
     async function handleUserSetup(uid, referrer){
       const userRef = ref(db, Path.userStats(uid));
       try{
@@ -238,7 +254,6 @@
           };
           await set(userRef, initial);
 
-          // credit referrer (if valid)
           if (referrer && referrer !== uid){
             const refRef = ref(db, Path.userStats(referrer));
             await transaction(refRef, (data)=>{
@@ -247,25 +262,24 @@
             });
           }
         } else {
-          // Update basic profile fields if changed
-          await update(userRef, { name: ENV.name, photo: ENV.photo || "", platform: ENV.platform, lastLogin: new Date().toISOString() });
+          await update(userRef, {
+            name: ENV.name, photo: ENV.photo || "", platform: ENV.platform, lastLogin: new Date().toISOString()
+          });
         }
       }catch(e){
         console.error("User setup failed:", e);
         showAlert("User setup failed. Check console.", "error");
       }
 
-      // Build correct referral link per mode
+      // referral link per mode
       const input = document.getElementById("referral-link-input");
       if (ENV.mode === "telegram"){
         input.value = `https://t.me/your_bot_username?start=${uid}`;
       } else {
-        // Browser: share same page with ?ref=
         input.value = `${location.origin}${location.pathname}?ref=${uid}`;
       }
     }
 
-    // ---- Live subscriptions ----
     function subscribeToUserData(uid){
       const userRef = ref(db, Path.userStats(uid));
       onValue(userRef, (snap)=>{
@@ -273,11 +287,9 @@
         if (!data) return;
         userStats = { ...userStats, ...data };
 
-        // Render UI
         document.getElementById("profile-img").src = (ENV.photo || 'https://placehold.co/100x100/eeeeee/333333?text=P');
         document.getElementById("username-display").textContent = userStats.name || ENV.name;
         document.getElementById("user-id-display").textContent = userStats.id;
-        document.getElementById("mode-display").textContent = ENV.mode;
         document.getElementById("total-coins").textContent = (userStats.coins||0).toLocaleString();
         document.getElementById("total-referrals").textContent = (userStats.reffer||0).toLocaleString();
         document.getElementById("tasks-completed").textContent = (userStats.tasksCompleted||0).toLocaleString();
@@ -319,7 +331,7 @@
             <p class="text-sm text-gray-500 mt-1">Reward:
               <span class="text-yellow-600 font-bold">${Number(t.reward||0).toLocaleString()} Coins</span>
             </p>
-            ${t.link?`<a class="text-xs text-[#0088cc] hover:underline mt-1 block" href="${t.link}" target="_blank">Open Link ${isQuick?'(Quick)': ''}</a>`:''}
+            ${t.link?`<a class="text-xs text-[#0088cc] hover:underline mt-1 block" href="${t.link}" target="_blank" rel="noopener">Open Link ${isQuick?'(Quick)': ''}</a>`:''}
           </div>
           <button class="button-primary text-sm px-3 py-2" onclick="claimReward('${t.id}', ${Number(t.reward||0)})">
             Claim
@@ -366,7 +378,7 @@
       try{
         await transaction(userRef, (curr)=>{
           if (!curr) return curr;
-          if ((curr.coins||0) < amount) return curr; // no change → abort
+          if ((curr.coins||0) < amount) return curr; // abort (no change means not committed)
           curr.coins = (curr.coins||0) - amount;
           return curr;
         });
@@ -396,28 +408,26 @@
 
     // ---- Init ----
     async function initApp(){
-      // 1) Detect env
+      // start with browser defaults; we may upgrade to telegram if available
       ENV = detectEnvironment();
-      document.getElementById("mode-display").textContent = ENV.mode;
 
-      // 2) Telegram SDK prepare (if inside Telegram)
-      if (ENV.mode === "telegram"){
-        try { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } catch(e){ console.warn("Telegram SDK init warn:", e); }
+      // try Telegram capture (if opened via WebApp button)
+      const tg = await getTelegramUserSafe();
+      if (tg) {
+        ENV = { ...ENV, mode: "telegram", platform: "telegram", uid: tg.id, name: tg.name, photo: tg.photo, referrerId: tg.referrerId };
       }
 
-      // 3) Firebase init per mode
+      // Firebase transport per mode
       initFirebase(ENV.mode);
 
-      // 4) Bootstrap user + listeners
+      // Bootstrap
       await handleUserSetup(ENV.uid, ENV.referrerId);
       subscribeToUserData(ENV.uid);
       subscribeToTasks();
 
-      // 5) UI tweaks
       isAppReady = true;
       console.log("App ready:", ENV);
 
-      // Optional: network hints
       window.addEventListener("offline", ()=>showAlert("You are offline.", "error"));
       window.addEventListener("online",  ()=>showAlert("Back online.", "success"));
     }
